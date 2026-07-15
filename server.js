@@ -38,6 +38,7 @@ app.get("/api/update", async (req, res) => {
 });
 
 // Старт сервера
+const PORT = process.env.PORT || 3000;
 app.listen(3000, () => {
   console.log("Applit price server running");
   updateCache();

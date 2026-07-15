@@ -25,16 +25,30 @@ const sources = {
   }
 };
 
-// Парсер цены
+// Новый улучшенный парсер цены
 async function parsePrice(url) {
   try {
     const response = await axios.get(url);
     const html = response.data;
 
-    const match = html.match(/(\d[\d\s]+)\s*руб/);
+    // 1) Ищем цену в <span class="price">
+    let match = html.match(/<span[^>]*class="price"[^>]*>([\d\s]+) BYN<\/span>/i);
+    if (match) return match[1].trim() + " BYN";
 
-    return match ? match[1].trim() + " руб." : null;
-  } catch {
+    // 2) Ищем цену в <div class="product-price">
+    match = html.match(/<div[^>]*class="product-price"[^>]*>([\d\s]+) BYN<\/div>/i);
+    if (match) return match[1].trim() + " BYN";
+
+    // 3) Ищем любое число перед BYN
+    match = html.match(/(\d[\d\s]+)\s*BYN/i);
+    if (match) return match[1].trim() + " BYN";
+
+    // 4) Ищем любое число перед руб.
+    match = html.match(/(\d[\d\s]+)\s*руб/i);
+    if (match) return match[1].trim() + " руб.";
+
+    return null;
+  } catch (err) {
     return null;
   }
 }
@@ -68,7 +82,7 @@ app.get("/api/update", async (req, res) => {
 });
 
 // Запуск сервера
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

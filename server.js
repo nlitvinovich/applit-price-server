@@ -8,14 +8,8 @@ app.use(cors());
 
 let productsCache = {};
 
-app.get("/", (req, res) => {
-  res.send("Applit Price Server is running (Full Catalog)");
-});
-
-// URL категории
 const CATEGORY_URL = "https://gadget-store.by/apple/";
 
-// Запуск браузера
 async function launchBrowser() {
   return puppeteer.launch({
     executablePath: chromium.path,
@@ -38,14 +32,15 @@ async function parseCatalog() {
 
   await page.goto(CATEGORY_URL, { waitUntil: "networkidle2" });
 
-  // Собираем все товары
   const products = await page.evaluate(() => {
-    const items = [...document.querySelectorAll(".product-card")];
+    const items = [...document.querySelectorAll("div.product-item")];
 
     return items.map(item => {
-      const name = item.querySelector(".product-title")?.innerText?.trim();
-      const url = item.querySelector("a")?.href;
-      return { name, url };
+      const name = item.querySelector(".product-item__title")?.innerText?.trim();
+      const url = item.querySelector("a.product-item__link")?.href;
+      const price = item.querySelector(".product-item__price")?.innerText?.trim();
+
+      return { name, url, price };
     });
   });
 
@@ -60,11 +55,10 @@ async function parsePrice(url) {
 
   await page.goto(url, { waitUntil: "networkidle2" });
 
-  // Ждём цену
-  await page.waitForSelector(".price", { timeout: 5000 }).catch(() => {});
-
   const price = await page.evaluate(() => {
-    const el = document.querySelector(".price");
+    const el =
+      document.querySelector(".price") ||
+      document.querySelector(".product-price");
     return el ? el.innerText.trim() : null;
   });
 
@@ -78,11 +72,11 @@ app.get("/api/update", async (req, res) => {
   const results = {};
 
   for (const item of catalog) {
-    const price = await parsePrice(item.url);
+    const finalPrice = item.price || await parsePrice(item.url);
 
     results[item.name] = {
       name: item.name,
-      price,
+      price: finalPrice,
       url: item.url
     };
   }

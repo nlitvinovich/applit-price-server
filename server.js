@@ -1,3 +1,6 @@
+app.get("/", (req, res) => {
+  res.send("Applit Price Server is running");
+});
 import express from "express";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";

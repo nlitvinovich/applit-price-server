@@ -1,11 +1,11 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
+import express from "express";
+import axios from "axios";
+import cors from "cors";
 
 const app = express();
 app.use(cors());
 
-// Кэш для данных
+// Кэш
 let productsCache = {};
 
 // Корневой маршрут
@@ -13,7 +13,7 @@ app.get("/", (req, res) => {
   res.send("Applit Price Server is running (gadget-store.by)");
 });
 
-// Источники данных — gadget-store.by
+// Источники данных
 const sources = {
   iphone17promax: {
     name: "iPhone 17 Pro Max",
@@ -25,17 +25,16 @@ const sources = {
   }
 };
 
-// Парсер цены для gadget-store.by
+// Парсер цены
 async function parsePrice(url) {
   try {
     const response = await axios.get(url);
     const html = response.data;
 
-    // Ищем цену вида: 4 999 руб.
     const match = html.match(/(\d[\d\s]+)\s*руб/);
 
     return match ? match[1].trim() + " руб." : null;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -55,7 +54,7 @@ app.get("/api/update", async (req, res) => {
 
     results[key] = {
       name: item.name,
-      price: price,
+      price,
       url: item.url
     };
   }
@@ -73,4 +72,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-

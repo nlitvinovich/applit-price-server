@@ -6,29 +6,18 @@ import puppeteer from "puppeteer-core";
 const app = express();
 app.use(cors());
 
-// Кэш
 let productsCache = {};
 
-// Корневой маршрут
 app.get("/", (req, res) => {
-  res.send("Applit Price Server is running (Puppeteer)");
+  res.send("Applit Price Server is running (Full Catalog)");
 });
 
-// Источники данных
-const sources = {
-  iphone17promax: {
-    name: "iPhone 17 Pro Max",
-    url: "https://gadget-store.by/apple/iphone-17-pro-max/"
-  },
-  iphone16plus: {
-    name: "iPhone 16 Plus",
-    url: "https://gadget-store.by/apple/iphone-16-plus/"
-  }
-};
+// URL категории
+const CATEGORY_URL = "https://gadget-store.by/apple/";
 
-// Puppeteer парсер
-async function parsePrice(url) {
-  const browser = await puppeteer.launch({
+// Запуск браузера
+async function launchBrowser() {
+  return puppeteer.launch({
     executablePath: chromium.path,
     args: [
       "--no-sandbox",
@@ -40,38 +29,58 @@ async function parsePrice(url) {
     ],
     headless: true
   });
+}
 
+// Парсер каталога
+async function parseCatalog() {
+  const browser = await launchBrowser();
   const page = await browser.newPage();
+
+  await page.goto(CATEGORY_URL, { waitUntil: "networkidle2" });
+
+  // Собираем все товары
+  const products = await page.evaluate(() => {
+    const items = [...document.querySelectorAll(".product-card")];
+
+    return items.map(item => {
+      const name = item.querySelector(".product-title")?.innerText?.trim();
+      const url = item.querySelector("a")?.href;
+      return { name, url };
+    });
+  });
+
+  await browser.close();
+  return products;
+}
+
+// Парсер цены товара
+async function parsePrice(url) {
+  const browser = await launchBrowser();
+  const page = await browser.newPage();
+
   await page.goto(url, { waitUntil: "networkidle2" });
 
-  // Ждём появления цены
+  // Ждём цену
   await page.waitForSelector(".price", { timeout: 5000 }).catch(() => {});
 
-  // Достаём цену
   const price = await page.evaluate(() => {
     const el = document.querySelector(".price");
-    if (!el) return null;
-    return el.innerText.trim();
+    return el ? el.innerText.trim() : null;
   });
 
   await browser.close();
   return price;
 }
 
-// API: получить товары
-app.get("/api/products", (req, res) => {
-  res.json(productsCache);
-});
-
-// API: обновить кэш
+// API: обновить весь каталог
 app.get("/api/update", async (req, res) => {
+  const catalog = await parseCatalog();
   const results = {};
 
-  for (const key in sources) {
-    const item = sources[key];
+  for (const item of catalog) {
     const price = await parsePrice(item.url);
 
-    results[key] = {
+    results[item.name] = {
       name: item.name,
       price,
       url: item.url
@@ -82,11 +91,16 @@ app.get("/api/update", async (req, res) => {
 
   res.json({
     status: "updated",
+    count: catalog.length,
     products: productsCache
   });
 });
 
-// Запуск сервера
+// API: получить товары
+app.get("/api/products", (req, res) => {
+  res.json(productsCache);
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

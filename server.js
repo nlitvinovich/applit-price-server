@@ -1,6 +1,7 @@
 import express from "express";
-import axios from "axios";
 import cors from "cors";
+import chromium from "chromium";
+import puppeteer from "puppeteer-core";
 
 const app = express();
 app.use(cors());
@@ -10,7 +11,7 @@ let productsCache = {};
 
 // Корневой маршрут
 app.get("/", (req, res) => {
-  res.send("Applit Price Server is running (gadget-store.by)");
+  res.send("Applit Price Server is running (Puppeteer)");
 });
 
 // Источники данных
@@ -25,32 +26,36 @@ const sources = {
   }
 };
 
-// Новый улучшенный парсер цены
+// Puppeteer парсер
 async function parsePrice(url) {
-  try {
-    const response = await axios.get(url);
-    const html = response.data;
+  const browser = await puppeteer.launch({
+    executablePath: chromium.path,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--single-process",
+      "--no-zygote"
+    ],
+    headless: true
+  });
 
-    // 1) Ищем цену в <span class="price">
-    let match = html.match(/<span[^>]*class="price"[^>]*>([\d\s]+) BYN<\/span>/i);
-    if (match) return match[1].trim() + " BYN";
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "networkidle2" });
 
-    // 2) Ищем цену в <div class="product-price">
-    match = html.match(/<div[^>]*class="product-price"[^>]*>([\d\s]+) BYN<\/div>/i);
-    if (match) return match[1].trim() + " BYN";
+  // Ждём появления цены
+  await page.waitForSelector(".price", { timeout: 5000 }).catch(() => {});
 
-    // 3) Ищем любое число перед BYN
-    match = html.match(/(\d[\d\s]+)\s*BYN/i);
-    if (match) return match[1].trim() + " BYN";
+  // Достаём цену
+  const price = await page.evaluate(() => {
+    const el = document.querySelector(".price");
+    if (!el) return null;
+    return el.innerText.trim();
+  });
 
-    // 4) Ищем любое число перед руб.
-    match = html.match(/(\d[\d\s]+)\s*руб/i);
-    if (match) return match[1].trim() + " руб.";
-
-    return null;
-  } catch (err) {
-    return null;
-  }
+  await browser.close();
+  return price;
 }
 
 // API: получить товары

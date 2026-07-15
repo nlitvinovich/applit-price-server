@@ -9,7 +9,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: applit-redis
-          type: redis
+          property: connectionString
 
   - type: worker
     name: applit-worker
@@ -21,8 +21,9 @@ services:
       - key: REDIS_URL
         fromService:
           name: applit-redis
-          type: redis
+          property: connectionString
 
   - type: redis
     name: applit-redis
     plan: free
+    ipAllowList: []

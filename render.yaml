@@ -12,20 +12,21 @@ services:
           type: redis
           property: connectionString
 
-  - type: worker
-    name: applit-worker
-    env: node
+  - type: redis
+    name: applit-redis
     plan: free
+    ipAllowList: []
+
+jobs:
+  - name: applit-cron
+    type: cron
+    env: node
+    schedule: "0 * * * *" # запуск каждый час
     buildCommand: "npm install"
-    startCommand: "npm run worker"
+    startCommand: "node worker.js"
     envVars:
       - key: REDIS_URL
         fromService:
           name: applit-redis
           type: redis
           property: connectionString
-
-  - type: redis
-    name: applit-redis
-    plan: free
-    ipAllowList: []

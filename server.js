@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
-import chromium from "chromium";
-import puppeteer from "puppeteer-core";
+import { chromium } from "playwright";
 
 const app = express();
 app.use(cors());
@@ -10,30 +9,17 @@ let productsCache = {};
 
 const CATEGORY_URL = "https://gadget-store.by/apple/";
 
-async function launchBrowser() {
-  return puppeteer.launch({
-    executablePath: chromium.path,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-      "--no-zygote"
-    ],
-    headless: true
-  });
-}
-
-// Парсер каталога
 async function parseCatalog() {
-  const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox"]
+  });
 
-  await page.goto(CATEGORY_URL, { waitUntil: "networkidle2" });
+  const page = await browser.newPage();
+  await page.goto(CATEGORY_URL, { waitUntil: "networkidle" });
 
   const products = await page.evaluate(() => {
-    const items = [...document.querySelectorAll("div.product-item")];
+    const items = [...document.querySelectorAll(".product-item")];
 
     return items.map(item => {
       const name = item.querySelector(".product-item__title")?.innerText?.trim();
@@ -48,12 +34,14 @@ async function parseCatalog() {
   return products;
 }
 
-// Парсер цены товара
 async function parsePrice(url) {
-  const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox"]
+  });
 
-  await page.goto(url, { waitUntil: "networkidle2" });
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "networkidle" });
 
   const price = await page.evaluate(() => {
     const el =
@@ -66,7 +54,6 @@ async function parsePrice(url) {
   return price;
 }
 
-// API: обновить весь каталог
 app.get("/api/update", async (req, res) => {
   const catalog = await parseCatalog();
   const results = {};
@@ -90,7 +77,6 @@ app.get("/api/update", async (req, res) => {
   });
 });
 
-// API: получить товары
 app.get("/api/products", (req, res) => {
   res.json(productsCache);
 });
